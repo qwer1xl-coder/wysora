@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>wysora</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Outfit (современный кибер-минимализм) и Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        jp: ['Noto Sans JP', 'sans-serif'],
+                    },
+                    colors: {
+                        sakura: {
+                            50: '#fff0f5',
+                            100: '#ffe4ee',
+                            200: '#ffc9de',
+                            300: '#ffa1c5',
+                            400: '#ff699f',
+                            500: '#f83b7f',
+                            600: '#e11d62',
+                            700: '#be114b',
+                            800: '#9f1141',
+                            900: '#86133a',
+                        }
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(255, 161, 197, 0.15)',
+                        'pink-glow': '0 0 20px rgba(248, 59, 127, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #fff0f5 0%, #ffffff 100%);
+            color: #1f2937;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 100vh;
+        }
+
+        /* Анимация лепестков сакуры */
+        #sakura-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .petal {
+            position: absolute;
+            background: linear-gradient(135deg, #ffc9de, #ffa1c5);
+            border-radius: 15px 0px 15px 0px;
+            opacity: 0.6;
+            animation: fall linear infinite;
+        }
+        @keyframes fall {
+            0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.5; }
+            100% { transform: translate3d(150px, 100vh, 0) rotate(360deg); opacity: 0; }
+        }
+
+        /* Glassmorphism Карточки */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px rgba(255, 161, 197, 0.1);
+        }
+
+        /* Анимация вкладок */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Стили кнопок */
+        .sakura-btn {
+            background: linear-gradient(135deg, #f83b7f 0%, #ff699f 100%);
+            box-shadow: 0 4px 15px rgba(248, 59, 127, 0.3);
+            transition: all 0.2s ease;
+            color: white;
+        }
+        .sakura-btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 2px 8px rgba(248, 59, 127, 0.2);
+        }
+
+        .division-chip.active {
+            background: #f83b7f;
+            color: white;
+            border-color: #f83b7f;
+            box-shadow: 0 0 10px rgba(248, 59, 127, 0.2);
+        }
+        .division-chip {
+            background: rgba(255, 255, 255, 0.8);
+            color: #6b7280;
+            border: 1px solid #ffc9de;
+            transition: all 0.2s ease;
+        }
+
+        /* Принудительный нижний регистр для атмосферы */
+        body, p, h1, h2, h3, span, div, button, label, select, textarea, input, a, li, b, i {
+            text-transform: lowercase !important;
+        }
+        #appTag {
+            text-transform: uppercase !important;
+        }
+        .fa-solid, .fa-brands {
+            text-transform: none !important; /* чтобы иконки не ломались */
+        }
+        
+        /* Кастомный розовый скроллбар */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffc9de;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ffa1c5;
+        }
+    </style>
+</head>
+<body class="pb-24 select-none">
+
+    <!-- Контейнер для сакуры -->
+    <div id="sakura-container"></div>
+
+    <!-- Всплывающее уведомление (Toast) -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-4">
+        <div class="bg-white border border-sakura-300 text-sakura-700 px-5 py-3 rounded-2xl shadow-glass flex items-center gap-3 backdrop-blur-md">
+            <i id="toast-icon" class="fa-solid fa-check-circle text-sakura-500 text-lg"></i>
+            <span id="toast-text" class="text-sm font-bold tracking-wide">Успешно!</span>
+        </div>
+    </div>
+
+    <!-- ГЛАВНЫЙ КОНТЕЙНЕР MINI APP -->
+    <div class="relative z-10 max-w-md mx-auto px-4 pt-4">
+
+        <!-- ВЕРХНЯЯ ШАПКА (HEADER) -->
+        <header class="glass-card p-4 rounded-3xl mb-5 text-center relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-sakura-200 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2"></div>
+            
+            <div class="relative flex flex-col items-center">
+                <!-- Логотип/Символ -->
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-sakura-100 to-white flex items-center justify-center border border-white shadow-sm mb-2">
+                    <i class="fa-brands fa-d-and-d text-3xl text-transparent bg-clip-text bg-gradient-to-r from-sakura-600 to-sakura-400"></i>
+                </div>
+                
+                <h1 class="font-sans font-black text-3xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-sakura-700 to-sakura-500">
+                    wysora
+                </h1>
+            </div>
+        </header>
+
+        <!-- НАВИГАЦИЯ ПО ВКЛАДКАМ (3 Вкладки) -->
+        <nav class="sticky top-2 z-30 bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white mb-5 shadow-sm">
+            <div class="grid grid-cols-3 gap-1">
+                <button onclick="switchTab('about')" id="tab-btn-about" class="tab-btn active flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all bg-sakura-500 text-white shadow-md">
+                    <i class="fa-solid fa-fan text-sm mb-0.5"></i>
+                    <span>О нас</span>
+                </button>
+                <button onclick="switchTab('roster')" id="tab-btn-roster" class="tab-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold text-gray-400 hover:text-sakura-600 transition-all">
+                    <i class="fa-solid fa-users text-sm mb-0.5"></i>
+                    <span>Состав</span>
+                </button>
+                <button onclick="switchTab('apply')" id="tab-btn-apply" class="tab-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold text-gray-400 hover:text-sakura-600 transition-all relative">
+                    <span class="absolute top-1.5 right-4 w-2 h-2 bg-sakura-500 rounded-full animate-pulse"></span>
+                    <i class="fa-solid fa-envelope-open-text text-sm mb-0.5"></i>
+                    <span>Заявка</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- ========================================================= -->
+        <!-- ВКЛАДКА 1: О НАС                                          -->
+        <!-- ========================================================= -->
+        <main id="tab-about" class="tab-content active space-y-4">
+            
+            <!-- Описание -->
+            <div class="glass-card rounded-3xl p-5">
+                <h2 class="font-sans text-lg font-bold text-sakura-800 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-leaf text-sakura-400"></i> добро пожаловать
+                </h2>
+                <p class="text-[13px] text-gray-700 leading-relaxed font-medium">
+                    мы — киберспортивная организация <b class="text-sakura-600">wysora</b>, базирующаяся на амбициях и японской эстетике. наша цель — доминирование на киберспортивной арене.
+                </p>
+                <div class="mt-4 p-3.5 bg-gradient-to-r from-sakura-50 to-white rounded-2xl border border-sakura-100 shadow-inner">
+                    <p class="text-[13px] text-gray-800 leading-relaxed font-semibold">
+                        у нас есть <span class="text-sakura-600">основной клуб</span>, несколько соревновательных составов и недавно открылась наша собственная <span class="text-sakura-600 font-bold">академия</span>!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Цели на сезон -->
+            <div class="glass-card rounded-3xl p-5">
+                <h3 class="font-sans text-sm font-bold text-sakura-800 uppercase tracking-wider mb-4">цели на сезон</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 rounded bg-sakura-500 text-white flex items-center justify-center text-[10px] shadow-sm"><i class="fa-solid fa-check"></i></div>
+                        <span class="text-xs font-medium text-gray-700">сыграть несколько скримов</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 rounded bg-sakura-500 text-white flex items-center justify-center text-[10px] shadow-sm"><i class="fa-solid fa-check"></i></div>
+                        <span class="text-xs font-medium text-gray-700">попробовать себя в турнирах matcherino</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 rounded bg-sakura-500 text-white flex items-center justify-center text-[10px] shadow-sm"><i class="fa-solid fa-check"></i></div>
+                        <span class="text-xs font-medium text-gray-700">набрать несколько ростеров</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 rounded border-2 border-sakura-300 text-transparent flex items-center justify-center text-[10px]"><i class="fa-solid fa-check"></i></div>
+                        <span class="text-xs font-medium text-gray-700">попасть в месячные финалы</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Достижения -->
+            <div class="glass-card rounded-3xl p-5">
+                <h3 class="font-sans text-sm font-bold text-sakura-800 uppercase tracking-wider mb-4">наши ценности</h3>
+                <ul class="space-y-3 text-xs text-gray-700 font-medium">
+                    <li class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-sakura-100 flex items-center justify-center text-sakura-500 shrink-0 mt-0.5"><i class="fa-solid fa-heart text-[10px]"></i></div>
+                        <span>мы больше чем команда — мы друзья. постоянно играем вместе, общаемся и активно помогаем друг другу пушить кубки в ладдере.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-sakura-100 flex items-center justify-center text-sakura-500 shrink-0 mt-0.5"><i class="fa-solid fa-gamepad text-[10px]"></i></div>
+                        <span>регулярно играем скримы против сильных оппонентов и участвуем в турнирах на matcherino для получения опыта и призовых.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-sakura-100 flex items-center justify-center text-sakura-500 shrink-0 mt-0.5"><i class="fa-solid fa-seedling text-[10px]"></i></div>
+                        <span>отсутствие токсичности. мы развиваемся вместе, а лучшие игроки из академии со временем переходят в основной состав.</span>
+                    </li>
+                </ul>
+            </div>
+        </main>
+
+        <!-- ========================================================= -->
+        <!-- ВКЛАДКА 2: СОСТАВ (ROSTER)                                -->
+        <!-- ========================================================= -->
+        <main id="tab-roster" class="tab-content space-y-4">
+            
+            <div class="flex items-center justify-between px-2">
+                <h2 class="font-sans text-lg font-black text-gray-800">основной ростер</h2>
+                <span class="text-[10px] font-bold text-sakura-600 bg-sakura-100 px-2 py-1 rounded-full">emea</span>
+            </div>
+
+            <!-- Игрок 1: qwer1xl -->
+            <div class="glass-card rounded-3xl p-4 flex gap-4 items-center relative overflow-hidden">
+                <div class="w-1.5 h-full bg-sakura-400 absolute left-0 top-0"></div>
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-white shadow-md shrink-0 text-xl font-bold">
+                    q
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-sans font-bold text-lg text-gray-800 leading-tight">qwer1xl</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Игрок 2: Monree -->
+            <div class="glass-card rounded-3xl p-4 flex gap-4 items-center relative overflow-hidden">
+                <div class="w-1.5 h-full bg-sakura-300 absolute left-0 top-0"></div>
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white shadow-md shrink-0 text-xl font-bold">
+                    m
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-sans font-bold text-lg text-gray-800 leading-tight">monree</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Игрок 3: Forz1r -->
+            <div class="glass-card rounded-3xl p-4 flex gap-4 items-center relative overflow-hidden">
+                <div class="w-1.5 h-full bg-sakura-500 absolute left-0 top-0"></div>
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-400 to-red-500 flex items-center justify-center text-white shadow-md shrink-0 text-xl font-bold">
+                    f
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-sans font-bold text-lg text-gray-800 leading-tight">forz1r</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Баннер про другие составы -->
+            <div class="mt-4 p-4 rounded-3xl bg-gradient-to-r from-sakura-400 to-sakura-500 text-white shadow-pink-glow relative overflow-hidden">
+                <div class="absolute right-0 bottom-0 opacity-20 text-6xl transform translate-x-4 translate-y-4">
+                    <i class="fa-solid fa-earth-americas"></i>
+                </div>
+                <h3 class="font-sans font-bold text-sm mb-1 relative z-10">🌟 другие регионы</h3>
+                <p class="text-[11px] font-medium opacity-90 relative z-10">
+                    помимо emea, <b class="font-black">у нас также есть составы на другие регионы</b>. твой скилл точно найдет применение!
+                </p>
+            </div>
+        </main>
+
+        <!-- ========================================================= -->
+        <!-- ВКЛАДКА 3: ЗАЯВКА (АПЛИКАЦИЯ)                             -->
+        <!-- ========================================================= -->
+        <main id="tab-apply" class="tab-content">
+            
+            <!-- Форма анкеты -->
+            <form id="applicationForm" onsubmit="handleFormSubmit(event)" class="glass-card rounded-3xl p-5 space-y-4">
+                <div class="text-center mb-4">
+                    <h2 class="font-sans text-xl font-bold text-gray-800">Присоединяйся к нам</h2>
+                    <p class="text-[11px] text-gray-500 mt-1">Заполни анкету, и менеджеры свяжутся с тобой.</p>
+                </div>
+
+                <!-- Куда подаем -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-2">Куда подаешь заявку? *</label>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="selectDivision(this, 'Основа')" class="division-chip active flex-1 py-2 rounded-xl text-xs font-bold">Основа</button>
+                        <button type="button" onclick="selectDivision(this, 'Клуб')" class="division-chip flex-1 py-2 rounded-xl text-xs font-bold">Клуб</button>
+                        <button type="button" onclick="selectDivision(this, 'Академия')" class="division-chip flex-1 py-2 rounded-xl text-xs font-bold">Академия</button>
+                    </div>
+                </div>
+
+                <!-- Тег и Возраст -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">тег в bs *</label>
+                        <input type="text" id="appTag" required placeholder="#2PPL..." class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">возраст *</label>
+                        <input type="number" id="appAge" required min="10" max="50" placeholder="16" class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                    </div>
+                </div>
+
+                <!-- Кубки и Ранг -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">кубки *</label>
+                        <input type="number" id="appTrophies" required min="0" placeholder="55000" class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">ранговый бой *</label>
+                        <select id="appRank" required class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm appearance-none">
+                            <option value="" disabled selected>выбери ранг</option>
+                            <option value="мифик или ниже">мифик или ниже</option>
+                            <option value="лега 1-2">лега 1-2</option>
+                            <option value="лега 3">лега 3</option>
+                            <option value="мастер 1">мастер 1</option>
+                            <option value="мастер 2">мастер 2</option>
+                            <option value="мастер 3">мастер 3</option>
+                            <option value="про ранг">про ранг</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Страна -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 mb-1">страна *</label>
+                    <input type="text" id="appCountry" required placeholder="например: украина, казахстан..." class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                </div>
+
+                <!-- Telegram и Discord -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">тг (@username) *</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sakura-400 font-bold text-xs">@</span>
+                            <input type="text" id="appTg" required placeholder="username" class="w-full bg-white border border-sakura-100 rounded-xl pl-7 pr-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">discord (не обяз.)</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sakura-400 font-bold text-xs">@</span>
+                            <input type="text" id="appDs" placeholder="username" class="w-full bg-white border border-sakura-100 rounded-xl pl-7 pr-3 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 transition-all shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- О себе -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Кратко о себе</label>
+                    <textarea id="appBio" rows="2" placeholder="Опыт, мейны, прайм-тайм..." class="w-full bg-white border border-sakura-100 rounded-xl px-3 py-2.5 text-xs font-medium text-gray-800 focus:outline-none focus:border-sakura-400 focus:ring-2 focus:ring-sakura-100 resize-none transition-all shadow-sm"></textarea>
+                </div>
+
+                <!-- Кнопка отправки -->
+                <button type="submit" class="w-full sakura-btn font-sans font-bold text-sm py-3.5 rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 mt-2">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Отправить анкету</span>
+                </button>
+            </form>
+
+            <!-- БЛОК РЕЗУЛЬТАТА (Скрыт) -->
+            <div id="applicationSuccess" class="hidden glass-card p-6 rounded-3xl text-center space-y-4">
+                <div class="w-16 h-16 rounded-full bg-sakura-100 border-2 border-sakura-400 flex items-center justify-center mx-auto text-sakura-500 text-3xl shadow-sm">
+                    <i class="fa-solid fa-heart"></i>
+                </div>
+                <div>
+                    <h3 class="font-sans font-bold text-xl text-gray-800">Заявка создана!</h3>
+                    <p class="text-xs text-gray-500 mt-1">Анкета сформирована. Отправь её нашему менеджеру.</p>
+                </div>
+
+                <div class="bg-white/80 border border-sakura-100 rounded-xl p-3 text-left shadow-inner">
+                    <pre id="generatedApplicationPreview" class="text-[11px] text-gray-700 font-sans whitespace-pre-wrap leading-relaxed"></pre>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2.5 pt-2">
+                    <button onclick="copyApplicationText()" class="w-full bg-gray-800 text-white hover:bg-gray-700 font-bold text-xs py-3 rounded-xl uppercase tracking-wide flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-copy"></i> Скопировать
+                    </button>
+                    <button onclick="sendToTelegramBot()" class="w-full sakura-btn font-bold text-xs py-3 rounded-xl uppercase tracking-wide flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-telegram text-sm"></i> Отправить в TG
+                    </button>
+                    <button onclick="resetApplicationForm()" class="text-[11px] text-sakura-600 font-bold py-1 mt-1 hover:underline">
+                        Создать новую заявку
+                    </button>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- НИЖНЯЯ ПАНЕЛЬ -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-white/70 backdrop-blur-xl border-t border-sakura-100 py-3 px-4 z-40">
+        <div class="max-w-md mx-auto flex items-center justify-between text-[11px] text-gray-500 font-medium">
+            <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-sakura-400 animate-pulse"></span>
+                <span id="tgUserGreeting">wysora family</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="#" class="text-gray-400 hover:text-sakura-500 transition"><i class="fa-brands fa-discord text-lg"></i></a>
+                <a href="#" class="text-gray-400 hover:text-sakura-500 transition"><i class="fa-brands fa-telegram text-lg"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. АНИМАЦИЯ САКУРЫ
+        // ==========================================
+        function createSakuraPetals() {
+            const container = document.getElementById('sakura-container');
+            const petalCount = 20; // количество лепестков
+
+            for (let i = 0; i < petalCount; i++) {
+                let petal = document.createElement('div');
+                petal.classList.add('petal');
+                
+                // Рандомизация размера, позиции и скорости
+                let size = Math.random() * 8 + 6; // 6px - 14px
+                let left = Math.random() * 100; // 0% - 100%
+                let animDuration = Math.random() * 5 + 5; // 5s - 10s
+                let delay = Math.random() * 5; // 0s - 5s
+
+                petal.style.width = `${size}px`;
+                petal.style.height = `${size * 1.2}px`;
+                petal.style.left = `${left}vw`;
+                petal.style.animationDuration = `${animDuration}s`;
+                petal.style.animationDelay = `${delay}s`;
+
+                container.appendChild(petal);
+            }
+        }
+        window.addEventListener('DOMContentLoaded', createSakuraPetals);
+
+        // ==========================================
+        // 2. ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP API
+        // ==========================================
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#fff0f5');
+            tg.setBackgroundColor('#ffffff');
+
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                const greetingEl = document.getElementById('tgUserGreeting');
+                if (greetingEl) greetingEl.textContent = `Привет, ${user.first_name}!`;
+                
+                const tgInput = document.getElementById('appTg');
+                if (tgInput && user.username) tgInput.value = user.username;
+            }
+        }
+
+        // ==========================================
+        // 3. НАВИГАЦИЯ ПО ВКЛАДКАМ
+        // ==========================================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-sakura-500', 'text-white', 'shadow-md', 'font-extrabold');
+                btn.classList.add('text-gray-400', 'font-bold');
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.classList.remove('text-gray-400', 'font-bold');
+            activeBtn.classList.add('bg-sakura-500', 'text-white', 'shadow-md', 'font-extrabold');
+
+            if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ==========================================
+        // 4. ЛОГИКА ФОРМЫ
+        // ==========================================
+        let selectedDivision = 'Основа';
+        let lastGeneratedText = '';
+
+        function selectDivision(btn, divName) {
+            selectedDivision = divName;
+            document.querySelectorAll('.division-chip').forEach(el => {
+                el.classList.remove('active');
+            });
+            btn.classList.add('active');
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            let tag = document.getElementById('appTag').value.trim().toUpperCase();
+            if (!tag.startsWith('#')) tag = '#' + tag;
+            const age = document.getElementById('appAge').value;
+            const trophies = Number(document.getElementById('appTrophies').value).toLocaleString('ru-RU');
+            const rank = document.getElementById('appRank').value;
+            const country = document.getElementById('appCountry').value.trim();
+            let tgUser = document.getElementById('appTg').value.trim().replace('@', '');
+            let dsUser = document.getElementById('appDs').value.trim().replace('@', '');
+            const bio = document.getElementById('appBio').value.trim() || '-';
+            
+            let dsText = dsUser ? `\n👾 дс: @${dsUser}` : '';
+
+            lastGeneratedText = 
+`🌸 заявка в wysora
+━━━━━━━━━━━━━━
+🎯 куда: ${selectedDivision}
+🔖 тег: ${tag}
+🏆 кубки: ${trophies}
+💎 ранг: ${rank}
+🌍 страна: ${country}
+🎂 возраст: ${age}
+📱 тг: @${tgUser}${dsText}
+📝 о себе: ${bio}`.toLowerCase(); // делаем весь текст анкеты строчным для стиля
+
+            // Восстанавливаем тег в верхний регистр, чтобы его можно было вставить в игре
+            lastGeneratedText = lastGeneratedText.replace(`тег: ${tag.toLowerCase()}`, `тег: ${tag}`);
+
+            document.getElementById('generatedApplicationPreview').textContent = lastGeneratedText;
+            document.getElementById('applicationForm').classList.add('hidden');
+            document.getElementById('applicationSuccess').classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 80,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#ffc9de', '#f83b7f', '#ffffff']
+                });
+            }
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function copyApplicationText() {
+            copyText(lastGeneratedText, 'Анкета скопирована!');
+        }
+
+        function sendToTelegramBot() {
+            if (tg && tg.initData) {
+                tg.sendData(JSON.stringify({
+                    action: 'apply_wysora',
+                    text: lastGeneratedText
+                }));
+            } else {
+                copyText(lastGeneratedText, 'Скопировано! Отправь менеджеру.');
+            }
+        }
+
+        function resetApplicationForm() {
+            document.getElementById('applicationSuccess').classList.add('hidden');
+            document.getElementById('applicationForm').classList.remove('hidden');
+        }
+
+        // ==========================================
+        // 5. УТИЛИТЫ (Toast, Copy)
+        // ==========================================
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').textContent = message;
+
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 2500);
+        }
+
+        function copyText(text, msg) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            showToast(msg);
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        }
+    </script>
+</body>
+</html>
